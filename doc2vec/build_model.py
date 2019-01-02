@@ -29,6 +29,10 @@ class Doc2VecModelBuilder:
         ALPHA = 0.025
         MIN_ALPHA = 0.00025
         LEARNING_RATE_DECAY = 0.0002
+        """
+        If `dm=1`, 'distributed memory' (PV-DM) is used.
+            Otherwise, `distributed bag of words` (PV-DBOW) is employed.
+        """
         self.model = Doc2Vec(vector_size=VEC_SIZE,
                              alpha=ALPHA,
                              min_alpha=MIN_ALPHA,
@@ -37,7 +41,7 @@ class Doc2VecModelBuilder:
         self.model.build_vocab(self.tagged_docs)
         print("Corpus count:", self.model.corpus_count)
         for epoch in range(MAX_EPOCHS):
-            print("iteration:", epoch)
+            print("iteration: {0}/{1}".format(epoch + 1, MAX_EPOCHS))
             self.model.train(self.tagged_docs,
                              total_examples=self.model.corpus_count,
                              epochs=self.model.iter)
