@@ -20,7 +20,7 @@ class Doc2VecModelBuilder:
         articles_list = dom.getElementsByTagName('article')
         # print(preprocess(articles_list[0].childNodes[0].nodeValue).split())
         self.tagged_docs = [
-            TaggedDocument(words=preprocess(articles_list[0].childNodes[0].nodeValue).split(), tags=article.attributes['id'].value) for
+            TaggedDocument(words=preprocess(articles_list[0].childNodes[0].nodeValue).split(), tags=[int(article.attributes['id'].value)]) for
             article in articles_list]
 
     def train(self):
@@ -39,7 +39,7 @@ class Doc2VecModelBuilder:
                              min_count=1,
                              dm=1)
         self.model.build_vocab(self.tagged_docs)
-        print("Corpus count:", self.model.corpus_count)
+        print("Corpus count:", self.model.docvecs.count)
         for epoch in range(MAX_EPOCHS):
             print("iteration: {0}/{1}".format(epoch + 1, MAX_EPOCHS))
             self.model.train(self.tagged_docs,
@@ -49,6 +49,7 @@ class Doc2VecModelBuilder:
             self.model.alpha -= LEARNING_RATE_DECAY
             # fix the learning rate, no decay
             self.model.min_alpha = self.model.alpha
+        print(self.model.docvecs[11], self.model.docvecs[11].shape)
 
     def save_model(self):
         self.model.save("news_articles.d2v")
