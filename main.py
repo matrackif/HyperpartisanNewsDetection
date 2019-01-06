@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     history = model.fit(train_x, train_y, epochs=50, batch_size=50, validation_data=(test_x, test_y),
                              verbose=2)
-    print('Keras Rolling window model: finished training in %s seconds' % (time.time() - start_time))
+    print('Keras model finished training in %s seconds' % (time.time() - start_time))
     # plot history
 
     plt.figure(0)
