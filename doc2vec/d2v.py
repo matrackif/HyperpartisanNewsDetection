@@ -25,7 +25,7 @@ class Doc2VecModelBuilder:
             article in articles_list]
 
     def train(self):
-        MAX_EPOCHS = 10
+        MAX_EPOCHS = 50
         ALPHA = 0.025
         MIN_ALPHA = 0.00025
         LEARNING_RATE_DECAY = 0.0002
@@ -40,7 +40,7 @@ class Doc2VecModelBuilder:
                              dm=1)
         self.model.build_vocab(self.tagged_docs)
         print("Corpus count:", self.model.docvecs.count)
-        for epoch in range(0):
+        for epoch in range(MAX_EPOCHS):
             print("iteration: {0}/{1}".format(epoch + 1, MAX_EPOCHS))
             self.model.train(self.tagged_docs,
                              total_examples=self.model.corpus_count,
