@@ -25,14 +25,13 @@ if __name__ == '__main__':
         dom = minidom.parseString(text)
     articles_list = dom.getElementsByTagName('article')
 
-    # TODO initialize train_y/test_y
     for i in range(train_count):
         train_x[i] = doc_2_vec_model.model.docvecs[i]
-        train_y[i] = int(bool(articles_list[i].getAttribute('hyperpartisan')))
+        train_y[i] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
     j = 0
     for i in range(train_count, train_count + test_count):
         test_x[j] = doc_2_vec_model.model.docvecs[i]
-        test_y[j] = int(bool(articles_list[i].getAttribute('hyperpartisan')))
+        test_y[j] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
         j += 1
 
     print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
@@ -53,6 +52,12 @@ if __name__ == '__main__':
     plt.xlabel('Epoch')
     plt.legend()
     plt.show()
+    prediction_train = model.predict(train_x)
+    prediction_test = model.predict(test_x)
+    for i in range(len(prediction_train)):
+        prediction_train[i] = 0 if prediction_train[i] < 0.5 else 1
+    for i in range(len(prediction_test)):
+        prediction_test[i] = 0 if prediction_test[i] < 0.5 else 1
 
-
-
+    print("Train correct percentage:", np.sum(prediction_train == train_y) / len(prediction_train))
+    print("Test set:", np.sum(prediction_test == test_y) / len(prediction_test))

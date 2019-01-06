@@ -40,7 +40,7 @@ class Doc2VecModelBuilder:
                              dm=1)
         self.model.build_vocab(self.tagged_docs)
         print("Corpus count:", self.model.docvecs.count)
-        for epoch in range(MAX_EPOCHS):
+        for epoch in range(0):
             print("iteration: {0}/{1}".format(epoch + 1, MAX_EPOCHS))
             self.model.train(self.tagged_docs,
                              total_examples=self.model.corpus_count,
