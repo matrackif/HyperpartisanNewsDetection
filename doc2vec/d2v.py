@@ -3,6 +3,7 @@ from xml.dom import minidom
 import codecs
 import re
 from doc2vec.preprocessor import preprocess
+TRAIN_PERCENTAGE = 0.8
 VEC_SIZE = 100
 
 
@@ -25,7 +26,7 @@ class Doc2VecModelBuilder:
             article in articles_list]
 
     def train(self):
-        MAX_EPOCHS = 50
+        MAX_EPOCHS = 1000
         ALPHA = 0.025
         MIN_ALPHA = 0.00025
         LEARNING_RATE_DECAY = 0.0002
@@ -42,7 +43,7 @@ class Doc2VecModelBuilder:
         print("Corpus count:", self.model.docvecs.count)
         for epoch in range(MAX_EPOCHS):
             print("iteration: {0}/{1}".format(epoch + 1, MAX_EPOCHS))
-            self.model.train(self.tagged_docs,
+            self.model.train(self.tagged_docs[:int(TRAIN_PERCENTAGE * len(self.tagged_docs))],
                              total_examples=self.model.corpus_count,
                              epochs=self.model.iter)
             # decrease the learning rate

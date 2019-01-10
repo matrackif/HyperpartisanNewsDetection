@@ -1,4 +1,5 @@
-from doc2vec.d2v import Doc2VecModelBuilder
+import doc2vec.d2v
+from gensim.models.doc2vec import Doc2Vec
 import keras
 import numpy as np
 import codecs
@@ -7,17 +8,20 @@ import models.baseline_model
 import time
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
-    doc_2_vec_model = Doc2VecModelBuilder('data/articles.xml')
-    doc_2_vec_model.train()
 
-    train_percentage = 0.8
-    train_count = int(train_percentage * doc_2_vec_model.model.docvecs.count)
-    test_count = doc_2_vec_model.model.docvecs.count - train_count
+if __name__ == '__main__':
+    """
+    doc_2_vec_model = doc2vec.d2v.Doc2VecModelBuilder('data/articles.xml')
+    doc_2_vec_model.train()
+    doc_2_vec_model.save_model()
+    """
+    doc_2_vec_model = Doc2Vec.load("data/news_articles.d2v")
+    train_count = int(doc2vec.d2v.TRAIN_PERCENTAGE * doc_2_vec_model.docvecs.count)
+    test_count = doc_2_vec_model.docvecs.count - train_count
     print('Train count:', train_count, 'Test count:', test_count)
     # initialize training/test x data
-    train_x = np.zeros(shape=(train_count, doc_2_vec_model.model.docvecs[0].shape[0]))
-    test_x = np.zeros(shape=(test_count, doc_2_vec_model.model.docvecs[0].shape[0]))
+    train_x = np.zeros(shape=(train_count, doc_2_vec_model.docvecs[0].shape[0]))
+    test_x = np.zeros(shape=(test_count, doc_2_vec_model.docvecs[0].shape[0]))
     train_y = np.zeros(shape=(train_count, 1))
     test_y = np.zeros(shape=(test_count, 1))
     with codecs.open("data/classifiedArticles.xml", 'r', encoding='utf8') as f:
@@ -26,11 +30,11 @@ if __name__ == '__main__':
     articles_list = dom.getElementsByTagName('article')
 
     for i in range(train_count):
-        train_x[i] = doc_2_vec_model.model.docvecs[i]
+        train_x[i] = doc_2_vec_model.docvecs[i]
         train_y[i] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
     j = 0
     for i in range(train_count, train_count + test_count):
-        test_x[j] = doc_2_vec_model.model.docvecs[i]
+        test_x[j] = doc_2_vec_model.docvecs[i]
         test_y[j] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
         j += 1
 
@@ -40,7 +44,7 @@ if __name__ == '__main__':
     model = models.baseline_model.create_baseline()
     start_time = time.time()
 
-    history = model.fit(train_x, train_y, epochs=50, batch_size=50, validation_data=(test_x, test_y),
+    history = model.fit(train_x, train_y, epochs=200, batch_size=50, validation_data=(test_x, test_y),
                              verbose=2)
     print('Keras model finished training in %s seconds' % (time.time() - start_time))
     # plot history
@@ -54,6 +58,7 @@ if __name__ == '__main__':
     plt.show()
     prediction_train = model.predict(train_x)
     prediction_test = model.predict(test_x)
+    print(prediction_test)
     for i in range(len(prediction_train)):
         prediction_train[i] = 0 if prediction_train[i] < 0.5 else 1
     for i in range(len(prediction_test)):
