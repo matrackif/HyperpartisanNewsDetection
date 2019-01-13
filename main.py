@@ -23,13 +23,14 @@ def get_labels(article):
     return {'id': article['@id'], 'label': article['@hyperpartisan'], 'url': article['@url']}
 
 
-def extract_training_data():
-    with codecs.open("data/classifiedArticles.xml", 'r', encoding='utf8') as f:
-        text = f.read()
-        labels_raw = bf.data(fromstring(text))
-    with codecs.open("data/articles.xml", 'r', encoding='utf8') as f:
+def extract_training_data(articles_file: str, classified_articles_file: str):
+    with codecs.open(articles_file, 'r', encoding='utf8') as f:
         text = f.read()
         articles_raw = bf.data(fromstring(text))
+    with codecs.open(classified_articles_file, 'r', encoding='utf8') as f:
+        text = f.read()
+        labels_raw = bf.data(fromstring(text))
+
     title = [get_data_from_article(article) for article in articles_raw['articles']['article']]
     labels = [get_labels(article) for article in labels_raw['articles']['article']]
     df_titles = pd.DataFrame(title)
@@ -90,9 +91,15 @@ def fit_using_logistic_regression(train_x, test_x, train_y, test_y):
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-k', action='store_true', default=False, help='Train Keras baselinem model, if false then use logistic regression')
+    arg_parser.add_argument('-k', action='store_true', default=False,
+                            help='Train Keras baseline model, if false then use logistic regression')
+    arg_parser.add_argument('-a', '--articles', nargs='?', type=str, default='data/articles.xml',
+                            const='data/articles.xml', help='Path to XML file of articles')
+    arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles.xml',
+                            const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
     args = vars(arg_parser.parse_args())
-    train_x, test_x, train_y, test_y = extract_training_data()
+    print(args)
+    train_x, test_x, train_y, test_y = extract_training_data(args['articles'], args['classified_articles'])
     print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
     print("train_y.shape:", train_y.shape, "test_y.shape", test_y.shape)
     if args['k']:
