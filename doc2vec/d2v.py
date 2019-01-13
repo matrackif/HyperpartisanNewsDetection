@@ -22,11 +22,11 @@ class Doc2VecModelBuilder:
         articles_list = dom.getElementsByTagName('article')
         # print(preprocess(articles_list[0].childNodes[0].nodeValue).split())
         self.tagged_docs = [
-            TaggedDocument(words=preprocess(articles_list[0].childNodes[0].nodeValue).split(), tags=[int(article.attributes['id'].value)]) for
+            TaggedDocument(words=article.attributes['title'].value.split(), tags=[int(article.attributes['id'].value)]) for
             article in articles_list]
 
     def train(self):
-        MAX_EPOCHS = 1000
+        MAX_EPOCHS = 20
         ALPHA = 0.025
         MIN_ALPHA = 0.00025
         LEARNING_RATE_DECAY = 0.0002

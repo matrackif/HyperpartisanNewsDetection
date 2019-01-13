@@ -1,51 +1,69 @@
-import doc2vec.d2v
-from gensim.models.doc2vec import Doc2Vec
-import keras
-import numpy as np
+from xmljson import badgerfish as bf
+from xml.etree.ElementTree import fromstring
 import codecs
-from xml.dom import minidom
+import pandas as pd
+from urllib.parse import urlsplit
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy as np
 import models.baseline_model
 import time
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
+import argparse
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, confusion_matrix
+from scikitplot.metrics import plot_confusion_matrix
 
 
-if __name__ == '__main__':
-    """
-    doc_2_vec_model = doc2vec.d2v.Doc2VecModelBuilder('data/articles.xml')
-    doc_2_vec_model.train()
-    doc_2_vec_model.save_model()
-    """
-    doc_2_vec_model = Doc2Vec.load("data/news_articles.d2v")
-    train_count = int(doc2vec.d2v.TRAIN_PERCENTAGE * doc_2_vec_model.docvecs.count)
-    test_count = doc_2_vec_model.docvecs.count - train_count
-    print('Train count:', train_count, 'Test count:', test_count)
-    # initialize training/test x data
-    train_x = np.zeros(shape=(train_count, doc_2_vec_model.docvecs[0].shape[0]))
-    test_x = np.zeros(shape=(test_count, doc_2_vec_model.docvecs[0].shape[0]))
-    train_y = np.zeros(shape=(train_count, 1))
-    test_y = np.zeros(shape=(test_count, 1))
+def get_data_from_article(article):
+    return {'id': article['@id'], 'title': article['@title']}
+
+
+def get_labels(article):
+    return {'id': article['@id'], 'label': article['@hyperpartisan'], 'url': article['@url']}
+
+
+def extract_training_data():
     with codecs.open("data/classifiedArticles.xml", 'r', encoding='utf8') as f:
         text = f.read()
-        dom = minidom.parseString(text)
-    articles_list = dom.getElementsByTagName('article')
+        labels_raw = bf.data(fromstring(text))
+    with codecs.open("data/articles.xml", 'r', encoding='utf8') as f:
+        text = f.read()
+        articles_raw = bf.data(fromstring(text))
+    title = [get_data_from_article(article) for article in articles_raw['articles']['article']]
+    labels = [get_labels(article) for article in labels_raw['articles']['article']]
+    df_titles = pd.DataFrame(title)
+    df_labels = pd.DataFrame(labels)
+    df = df_titles.merge(df_labels, on='id')
+    df.label = df.label.astype('int')
 
-    for i in range(train_count):
-        train_x[i] = doc_2_vec_model.docvecs[i]
-        train_y[i] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
-    j = 0
-    for i in range(train_count, train_count + test_count):
-        test_x[j] = doc_2_vec_model.docvecs[i]
-        test_y[j] = 1 if articles_list[i].getAttribute('hyperpartisan') == "true" else 0
-        j += 1
+    df['https'] = df.url.map(lambda x: urlsplit(x).scheme == 'https').astype('int')
+    df['domain'] = df.url.map(lambda x: urlsplit(x).netloc)
+    df['country'] = df.domain.map(lambda x: x.split('.')[-1])
+    print("Correlation between https and Hyperpartisan", df.corr())
+    df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
+    vectorizer = TfidfVectorizer(stop_words='english', )
+    vectorizer.fit(df_train.title)
+    train_x = np.concatenate((
+        vectorizer.transform(df_train.title).toarray(),
+        df_train.https.values.reshape(-1, 1),
+    ), axis=1)
+    test_x = np.concatenate((
+        vectorizer.transform(df_test.title).toarray(),
+        df_test.https.values.reshape(-1, 1),
+    ), axis=1)
 
-    print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
-    print("train_y.shape:", train_y.shape, "test_y.shape", test_y.shape)
+    train_y = df_train.label.values
+    test_y = df_test.label.values
+    return train_x, test_x, train_y, test_y
 
-    model = models.baseline_model.create_baseline()
+
+def train_using_keras(train_x, test_x, train_y, test_y):
+    model = models.baseline_model.create_baseline2(input_size=train_x.shape[1])
+    model.summary()
     start_time = time.time()
-
-    history = model.fit(train_x, train_y, epochs=200, batch_size=50, validation_data=(test_x, test_y),
-                             verbose=2)
+    history = model.fit(train_x, train_y, epochs=30, validation_data=(test_x, test_y),
+                        verbose=2)
     print('Keras model finished training in %s seconds' % (time.time() - start_time))
     # plot history
 
@@ -56,13 +74,29 @@ if __name__ == '__main__':
     plt.xlabel('Epoch')
     plt.legend()
     plt.show()
-    prediction_train = model.predict(train_x)
-    prediction_test = model.predict(test_x)
-    print(prediction_test)
-    for i in range(len(prediction_train)):
-        prediction_train[i] = 0 if prediction_train[i] < 0.5 else 1
-    for i in range(len(prediction_test)):
-        prediction_test[i] = 0 if prediction_test[i] < 0.5 else 1
 
-    print("Train correct percentage:", np.sum(prediction_train == train_y) / len(prediction_train))
-    print("Test set:", np.sum(prediction_test == test_y) / len(prediction_test))
+
+def fit_using_logistic_regression(train_x, test_x, train_y, test_y):
+    clf = LogisticRegression(solver='lbfgs')
+    clf.fit(train_x, train_y)
+    predictions_train = clf.predict(train_x)
+    predictions_test = clf.predict(test_x)
+    print("LogisticRegression classification report:")
+    print(classification_report(train_y, predictions_train))
+    # plot_confusion_matrix(train_y, predictions_train)
+    plot_confusion_matrix(test_y, predictions_test)
+    plt.show()
+
+
+if __name__ == "__main__":
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-k', action='store_true', default=False, help='Train Keras baselinem model, if false then use logistic regression')
+    args = vars(arg_parser.parse_args())
+    train_x, test_x, train_y, test_y = extract_training_data()
+    print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
+    print("train_y.shape:", train_y.shape, "test_y.shape", test_y.shape)
+    if args['k']:
+        train_using_keras(train_x, test_x, train_y, test_y)
+    else:
+        # use logistic regression
+        fit_using_logistic_regression(train_x, test_x, train_y, test_y)
