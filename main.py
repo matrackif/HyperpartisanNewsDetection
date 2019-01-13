@@ -44,6 +44,8 @@ def extract_training_data(articles_file: str, classified_articles_file: str):
     print("Correlation between https and Hyperpartisan", df.corr())
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
     vectorizer = TfidfVectorizer(stop_words='english', )
+    df_train.title = df_train.title.apply(str)
+    df_test.title = df_test.title.apply(str)
     vectorizer.fit(df_train.title)
     train_x = np.concatenate((
         vectorizer.transform(df_train.title).toarray(),
