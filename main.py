@@ -25,12 +25,8 @@ def get_labels(article):
 
 
 def extract_training_data(articles_file: str, classified_articles_file: str):
-    with codecs.open(articles_file, 'r', encoding='utf8') as f:
-        text = f.read()
-        articles_raw = bf.data(fromstring(text))
-    with codecs.open(classified_articles_file, 'r', encoding='utf8') as f:
-        text = f.read()
-        labels_raw = bf.data(fromstring(text))
+    articles_raw = pre.read_file(articles_file)
+    labels_raw = pre.read_file(classified_articles_file)
 
     title = [get_data_from_article(article) for article in articles_raw['articles']['article']]
     labels = [get_labels(article) for article in labels_raw['articles']['article']]
