@@ -4,6 +4,7 @@ import pandas as pd
 from xmljson import badgerfish as bf
 from xml.etree.ElementTree import fromstring
 from nltk.corpus import stopwords
+from nltk.stem.wordnet import WordNetLemmatizer
 
 
 def preprocess(text):
@@ -21,6 +22,7 @@ def preprocess(text):
 def analyze_articles(article_file):
     articles_raw = read_file(article_file)
     describe_dataset(articles_raw)
+    corpus = create_corpus(get_articles(articles_raw), False)
 
 
 def read_file(filename):
@@ -67,3 +69,25 @@ def get_article_text(article, txt):
                 else:
                     txt += get_article_text(item[1], '')
     return txt
+
+
+def create_corpus(articles, should_treat_each_article_separately: bool):
+    corpus = []
+    stop_words = get_stop_words()
+    lem = WordNetLemmatizer()
+    for i in range(0, len(articles)):
+        text = re.sub('[^a-zA-Z]', ' ', articles[i])
+        text = re.sub("(\\d|\\W)+", " ", text)
+        text = text.lower().split()
+        text = [lem.lemmatize(word) for word in text if not word in stop_words]
+        text = " ".join(text)
+        if should_treat_each_article_separately:
+            text = text.split()
+        corpus.append(text)
+    return corpus
+
+
+def get_stop_words():
+    stop_words = set(stopwords.words("english"))
+    new_words = ["one", "would", "also"]
+    return stop_words.union(new_words)
