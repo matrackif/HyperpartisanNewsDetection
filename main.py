@@ -13,6 +13,7 @@ import argparse
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 from scikitplot.metrics import plot_confusion_matrix
+import doc2vec.preprocessor as pre
 
 
 def get_data_from_article(article):
@@ -101,6 +102,7 @@ if __name__ == "__main__":
                             const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
     args = vars(arg_parser.parse_args())
     print(args)
+    pre.analyze_articles(args['articles'])
     train_x, test_x, train_y, test_y = extract_training_data(args['articles'], args['classified_articles'])
     print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
     print("train_y.shape:", train_y.shape, "test_y.shape", test_y.shape)
