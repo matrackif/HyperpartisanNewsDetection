@@ -5,6 +5,7 @@ from xmljson import badgerfish as bf
 from xml.etree.ElementTree import fromstring
 from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def preprocess(text):
@@ -23,6 +24,9 @@ def analyze_articles(article_file):
     articles_raw = read_file(article_file)
     describe_dataset(articles_raw)
     corpus = create_corpus(get_articles(articles_raw), False)
+    print(get_most_frequent_unigrams(corpus, 20))
+    print(get_most_frequent_bigrams(corpus, 20))
+    print(get_most_frequent_trigrams(corpus, 20))
 
 
 def read_file(filename):
@@ -91,3 +95,30 @@ def get_stop_words():
     stop_words = set(stopwords.words("english"))
     new_words = ["one", "would", "also"]
     return stop_words.union(new_words)
+
+
+def get_most_frequent_unigrams(corpus, n: int):
+    vec = CountVectorizer().fit(corpus)
+    return get_most_frequent(vec, corpus, n)
+
+
+def get_most_frequent_bigrams(corpus, n: int):
+    vec = CountVectorizer(ngram_range=(2, 2),
+                           max_features=2000).fit(corpus)
+    return get_most_frequent(vec, corpus, n)
+
+
+def get_most_frequent_trigrams(corpus, n: int):
+    vec = CountVectorizer(ngram_range=(3, 3),
+                           max_features=2000).fit(corpus)
+    return get_most_frequent(vec, corpus, n)
+
+
+def get_most_frequent(vec: CountVectorizer, corpus, n: int):
+    bag_of_words = vec.transform(corpus)
+    sum_words = bag_of_words.sum(axis=0)
+    words_freq = [(word, sum_words[0, idx]) for word, idx in
+                  vec.vocabulary_.items()]
+    words_freq = sorted(words_freq, key=lambda x: x[1],
+                        reverse=True)
+    return words_freq[:n]
