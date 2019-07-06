@@ -7,6 +7,9 @@ from nltk.corpus import stopwords
 from nltk.stem.wordnet import WordNetLemmatizer
 from sklearn.feature_extraction.text import CountVectorizer
 
+import nltk
+nltk.download('wordnet')
+
 
 def preprocess(text):
     # Replace any non-alpha numeric character with empty string
