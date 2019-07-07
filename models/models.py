@@ -40,6 +40,14 @@ def create_baseline2(**kwargs):
     model.add(BatchNormalization())
     model.add(Dense(NUM_NODES, kernel_initializer='normal', activation='relu', use_bias=True))
     model.add(BatchNormalization())
+    model.add(Dense(NUM_NODES, kernel_initializer='normal', activation='relu', use_bias=True))
+    model.add(BatchNormalization())
+    model.add(Dense(int(NUM_NODES / 2), kernel_initializer='normal', activation='relu', use_bias=True))
+    model.add(BatchNormalization())
+    model.add(Dense(int(NUM_NODES / 4), kernel_initializer='normal', activation='relu', use_bias=True))
+    model.add(BatchNormalization())
+    model.add(Dense(int(NUM_NODES / 8), kernel_initializer='normal', activation='relu', use_bias=True))
+    model.add(BatchNormalization())
     model.add(Dense(1, kernel_initializer='normal', activation='sigmoid'))
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
@@ -52,9 +60,8 @@ def create_lstm(**kwargs):
     model.add(Embedding(kwargs.get('vocab_size', 0),
                         64,  # Embedding size
                         input_length=kwargs.get('input_length', 0)))
-    model.add(LSTM(64))
+    model.add(LSTM(256))
     model.add(Dense(units=1, activation='sigmoid'))
-
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 

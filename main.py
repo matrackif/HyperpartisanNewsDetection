@@ -41,6 +41,9 @@ def get_df_from_articles_file(articles_file: str, classified_articles_file: str)
     df['country'] = df.domain.map(lambda x: x.split('.')[-1])
     # print("Correlation between https and Hyperpartisan", df.corr())
     df.title = df.title.apply(str)
+    article_titles = df.title.values.tolist()
+    preprocessed_titles = pre.create_corpus(article_titles, False)
+    df.title = preprocessed_titles
     return df
 
 
@@ -68,14 +71,10 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
     MAX_TITLE_LENGTH = 10  # max of 15 words in title
     df = get_df_from_articles_file(articles_file, classified_articles_file)
 
-    # Fit on both training and test data because we want to get vocab size of whole dataset
-    article_titles = df.title.values.tolist()
-    preprocessed_titles = pre.create_corpus(article_titles, False)
-    df.title = preprocessed_titles
     # TODO use tf_id representation instead of padded vectors as lstm input
     # For now  we only use it to count number of unique words
     vectorizer = TfidfVectorizer(stop_words='english', )
-    vectorizer.fit_transform(preprocessed_titles)
+    vectorizer.fit_transform(df.title.values)
     num_unique_words = len(vectorizer.get_feature_names())
 
     # integer encode the documents
@@ -120,7 +119,7 @@ def train_and_predict(articles_file: str, classified_articles_file: str, model_t
         # Keras model
         model.summary()
         start_time = time.time()
-        history = model.fit(train_x, train_y, epochs=100, validation_data=(test_x, test_y),
+        history = model.fit(train_x, train_y, epochs=256, validation_data=(test_x, test_y),
                             verbose=2)
         print('Keras model finished training in %s seconds' % (time.time() - start_time))
         # plot history
@@ -149,7 +148,7 @@ def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], inp
 
     num_correct_pred = np.sum(pred == actual_y)
     accuracy = (num_correct_pred / float(pred.shape[0])) * 100
-    print('------PREDICTION STATISTICs------')
+    print('------PREDICTION STATISTICS------')
     print('Total number of predictions:', pred.shape[0])
     print('Actual number of hyperpartisan articles:', num_actual_hyperpartisan)
     print('Actual number of non-hyperpartisan articles:', num_actual_nonhyperpartisan)
@@ -159,6 +158,7 @@ def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], inp
     print('Prediction accuracy: {}%'.format(accuracy))
     plot_confusion_matrix(actual_y, pred)
     plt.show()
+    print(classification_report(actual_y, pred))
 
 
 if __name__ == "__main__":
