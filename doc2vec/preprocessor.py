@@ -89,8 +89,9 @@ def create_corpus(articles, should_treat_each_article_separately: bool):
         text = [lem.lemmatize(word) for word in text if not word in stop_words]
         text = " ".join(text)
         if should_treat_each_article_separately:
-            text = text.split()
-        corpus.append(text)
+            corpus.append([text])
+        else:
+            corpus.append(text)
     return corpus
 
 
