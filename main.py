@@ -14,6 +14,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
 from scikitplot.metrics import plot_confusion_matrix
 import doc2vec.preprocessor as pre
+import keras
+from typing import Union
 
 
 def get_data_from_article(article):
@@ -57,7 +59,7 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     ), axis=1)
     train_y = df_train.label.values
     test_y = df_test.label.values
-    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y}
+    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
 
 # https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
@@ -95,14 +97,15 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
 
 
 def initialize_training_test_data(articles_file: str, classified_articles_file: str, model_type: str):
-    TRAINING_DATA_EXTRACTOR_FUNCS = {'dense': transform_to_tfid,
+    TRAINING_DATA_EXTRACTOR_FUNCS = {'logistic': transform_to_tfid,
+                                     'dense': transform_to_tfid,
                                      'lstm': transform_to_dense_representation}
     if model_type in TRAINING_DATA_EXTRACTOR_FUNCS.keys() and TRAINING_DATA_EXTRACTOR_FUNCS[model_type] is not None:
         return TRAINING_DATA_EXTRACTOR_FUNCS[model_type](articles_file, classified_articles_file)
     return None
 
 
-def train_using_keras(articles_file: str, classified_articles_file: str, model_type: str):
+def train_and_predict(articles_file: str, classified_articles_file: str, model_type: str):
     ret = initialize_training_test_data(articles_file, classified_articles_file, model_type)
     train_x = ret['train_x']
     train_y = ret['train_y']
@@ -111,54 +114,64 @@ def train_using_keras(articles_file: str, classified_articles_file: str, model_t
     print("train_x.shape:", train_x.shape, "test_x.shape", test_x.shape)
     print("train_y.shape:", train_y.shape, "test_y.shape", test_y.shape)
     model = models.models.get_model(model_type, ret)
-    model.summary()
-    start_time = time.time()
-    history = model.fit(train_x, train_y, epochs=100, validation_data=(test_x, test_y),
-                        verbose=2)
-    print('Keras model finished training in %s seconds' % (time.time() - start_time))
-    # plot history
+    if model_type == 'logistic':
+        model.fit(train_x, train_y)
+    else:
+        # Keras model
+        model.summary()
+        start_time = time.time()
+        history = model.fit(train_x, train_y, epochs=100, validation_data=(test_x, test_y),
+                            verbose=2)
+        print('Keras model finished training in %s seconds' % (time.time() - start_time))
+        # plot history
+        plt.figure(0)
+        plt.plot(history.history['loss'], label='Training loss (error)')
+        plt.plot(history.history['val_loss'], label='Test loss (error)')
+        plt.title('Training/test loss of article classifier')
+        plt.xlabel('Epoch')
+        plt.legend()
+        plt.show()
 
-    plt.figure(0)
-    plt.plot(history.history['loss'], label='Training loss (error)')
-    plt.plot(history.history['val_loss'], label='Test loss (error)')
-    plt.title('Training/test loss of article classifier')
-    plt.xlabel('Epoch')
-    plt.legend()
-    plt.show()
+    print(model_type, 'train data statistics:')
+    print_and_plot_statistics(model, train_x, train_y)
+    print(model_type, 'test data statistics:')
+    print_and_plot_statistics(model, test_x, test_y)
+    return model
 
 
-def fit_using_logistic_regression(articles_file: str, classified_articles_file: str):
-    ret = transform_to_tfid(articles_file, classified_articles_file)
-    train_x = ret['train_x']
-    train_y = ret['train_y']
-    test_x = ret['test_x']
-    test_y = ret['test_y']
-    clf = LogisticRegression(solver='lbfgs')
-    clf.fit(train_x, train_y)
-    predictions_train = clf.predict(train_x)
-    predictions_test = clf.predict(test_x)
-    print("LogisticRegression classification report:")
-    print(classification_report(train_y, predictions_train))
-    # plot_confusion_matrix(train_y, predictions_train)
-    plot_confusion_matrix(test_y, predictions_test)
+def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], input_x: np.ndarray, actual_y: np.ndarray):
+    pred = np.round(model.predict(input_x), decimals=0).reshape(-1)
+    num_actual_hyperpartisan = np.sum(actual_y)
+    num_actual_nonhyperpartisan = np.count_nonzero(actual_y == 0)
+
+    num_pred_hyperpartisan = np.sum(pred)
+    num_pred_nonhyperpartisan = np.count_nonzero(pred == 0)
+
+    num_correct_pred = np.sum(pred == actual_y)
+    accuracy = (num_correct_pred / float(pred.shape[0])) * 100
+    print('------PREDICTION STATISTICs------')
+    print('Total number of predictions:', pred.shape[0])
+    print('Actual number of hyperpartisan articles:', num_actual_hyperpartisan)
+    print('Actual number of non-hyperpartisan articles:', num_actual_nonhyperpartisan)
+    print('Predicted number of hyperpartisan articles:', num_pred_hyperpartisan)
+    print('Predicted number of non-hyperpartisan articles:', num_pred_nonhyperpartisan)
+    print('Number of correct predictions:', num_correct_pred)
+    print('Prediction accuracy: {}%'.format(accuracy))
+    plot_confusion_matrix(actual_y, pred)
     plt.show()
 
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument('-k', action='store_true', default=False,
-                            help='Train Keras baseline model, if false then use logistic regression')
+
     arg_parser.add_argument('-a', '--articles', nargs='?', type=str, default='data/articles.xml',
                             const='data/articles.xml', help='Path to XML file of articles')
     arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles.xml',
                             const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
-    arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='dense',
-                            const='dense', help='If -k (use Keras model) is selected, then this argument allows us to choose the model type. Supported values: dense, lstm')
+    arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='logistic',
+                            const='logistic', help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), logistic (sklearn Logistic Regression Classifier)')
     args = vars(arg_parser.parse_args())
     # print(args)
     # pre.analyze_articles(args['articles'])
-    if args['k']:
-        train_using_keras(args['articles'], args['classified_articles'], args['model'])
-    else:
-        # use logistic regression
-        fit_using_logistic_regression(args['articles'], args['classified_articles'])
+    train_and_predict(args['articles'], args['classified_articles'], args['model'])
+

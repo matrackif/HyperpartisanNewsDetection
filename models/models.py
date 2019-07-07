@@ -1,10 +1,12 @@
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, BatchNormalization, LSTM, Embedding
+from sklearn.linear_model import LogisticRegression
 
 
 def get_model(model_type: str, args: dict):
     MODELS = {'dense': create_baseline2,
-              'lstm': create_lstm}
+              'lstm': create_lstm,
+              'logistic': create_logistic_regression}
     if model_type in MODELS.keys() and MODELS[model_type] is not None:
         return MODELS[model_type](**args)
     return None
@@ -55,3 +57,7 @@ def create_lstm(**kwargs):
 
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
+
+
+def create_logistic_regression(**kwargs):
+    return LogisticRegression(solver='lbfgs')
