@@ -16,6 +16,7 @@ from scikitplot.metrics import plot_confusion_matrix
 import doc2vec.preprocessor as pre
 import keras
 from typing import Union
+from bert_embedding import BertEmbedding
 
 
 def get_data_from_article(article):
@@ -64,6 +65,24 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     test_y = df_test.label.values
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
+def transform_to_Bert(articles_file: str, classified_articles_file: str):
+    df = get_df_from_articles_file(articles_file, classified_articles_file)
+    df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
+    bert_embedding = BertEmbedding()
+    result_train = BertEmbedding(df_train.title.values.tolist())
+    result_test = BertEmbedding(df_test.title.values.tolist())
+    train_x = pd.DataFrame(result_train)
+    test_x = pd.DataFrame(result_train)
+    train_y = df_train.label.values
+    test_y = df_test.label.values
+    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
+
+
+
+
+
+
+
 
 # https://machinelearningmastery.com/use-word-embedding-layers-deep-learning-keras/
 # https://nlpforhackers.io/keras-intro/
@@ -97,7 +116,7 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
 
 def initialize_training_test_data(articles_file: str, classified_articles_file: str, model_type: str):
     TRAINING_DATA_EXTRACTOR_FUNCS = {'logistic': transform_to_tfid,
-                                     'dense': transform_to_tfid,
+                                     'dense': transform_to_Bert,
                                      'lstm': transform_to_dense_representation}
     if model_type in TRAINING_DATA_EXTRACTOR_FUNCS.keys() and TRAINING_DATA_EXTRACTOR_FUNCS[model_type] is not None:
         return TRAINING_DATA_EXTRACTOR_FUNCS[model_type](articles_file, classified_articles_file)

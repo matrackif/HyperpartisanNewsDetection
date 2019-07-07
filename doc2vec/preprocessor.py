@@ -9,6 +9,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 import nltk
 nltk.download('wordnet')
+nltk.download('stopwords')
 
 
 def preprocess(text):
