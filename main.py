@@ -53,14 +53,13 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
     vectorizer = TfidfVectorizer(stop_words='english', )
     vectorizer.fit(df_train.title)
-    train_x = np.concatenate((
-        vectorizer.transform(df_train.title).toarray(),
-        df_train.https.values.reshape(-1, 1),
-    ), axis=1)
-    test_x = np.concatenate((
-        vectorizer.transform(df_test.title).toarray(),
-        df_test.https.values.reshape(-1, 1),
-    ), axis=1)
+    train_x= vectorizer.transform(df_train.title)
+    train_x=train_x.toarray()
+    print(type(train_x))
+    print(train_x)
+    test_x= vectorizer.transform(df_test.title)
+    test_x=test_x.toarray()
+    print(test_x)
     train_y = df_train.label.values
     test_y = df_test.label.values
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
@@ -69,12 +68,22 @@ def transform_to_Bert(articles_file: str, classified_articles_file: str):
     df = get_df_from_articles_file(articles_file, classified_articles_file)
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
     bert_embedding = BertEmbedding()
-    result_train = BertEmbedding(df_train.title.values.tolist())
-    result_test = BertEmbedding(df_test.title.values.tolist())
-    train_x = pd.DataFrame(result_train)
-    test_x = pd.DataFrame(result_train)
+    df_titles_values=df_train.title.values.tolist()
+    result_train = bert_embedding(df_titles_values)
+    result_test = bert_embedding(df_test.title.values.tolist())
+    train_x = pd.DataFrame(result_train, columns=['A', 'Vector'])
+    train_x = train_x.drop(columns=['A'])
+
+    test_x = pd.DataFrame(result_test, columns=['A', 'Vector'])
+    test_x=test_x.drop(columns=['A'])
+    test_x=test_x.values
+    train_x=train_x.values
+    print(test_x)
+    print(train_x)
     train_y = df_train.label.values
     test_y = df_test.label.values
+    pad_sequences(train_x, maxlen=None, dtype='float32', padding='post', value=0.0)
+    pad_sequences(test_y, maxlen=None, dtype='float32', padding='post', value=0.0)
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
 
