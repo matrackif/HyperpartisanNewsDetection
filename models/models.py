@@ -1,12 +1,14 @@
 from keras.models import Sequential
-from keras.layers import Dense, Dropout, BatchNormalization, LSTM, Embedding
+from keras.layers import Dense, Dropout, BatchNormalization, LSTM, Embedding, Conv1D, MaxPooling1D, Flatten
 from sklearn.linear_model import LogisticRegression
 
 
 def get_model(model_type: str, args: dict):
     MODELS = {'dense': create_baseline2,
               'lstm': create_lstm,
-              'logistic': create_logistic_regression}
+              'logistic': create_logistic_regression,
+              'CNN': create_CNN1D}
+
     if model_type in MODELS.keys() and MODELS[model_type] is not None:
         return MODELS[model_type](**args)
     return None
@@ -68,3 +70,22 @@ def create_lstm(**kwargs):
 
 def create_logistic_regression(**kwargs):
     return LogisticRegression(solver='lbfgs')
+
+
+def create_CNN1D(**kwargs):
+    trainX = kwargs.get('train_x', None)
+    verbose, epochs, batch_size = 0, 10, 32
+    n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], 1
+    model = Sequential()
+    model.add(Conv1D(filters=1024, kernel_size=4, activation='relu', input_shape=(n_timesteps, n_features)))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Dropout(0.25))
+    model.add(Conv1D(filters=1024, kernel_size=4, activation='relu', input_shape=(n_timesteps, n_features)))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Dropout(0.25))
+    model.add(Flatten())
+    model.add(Dense(32, activation='relu'))
+    model.add(Dropout(0.5))
+    model.add(Dense(n_outputs, activation='sigmoid'))
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    return model

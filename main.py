@@ -48,6 +48,27 @@ def get_df_from_articles_file(articles_file: str, classified_articles_file: str)
     return df
 
 
+def get_df_from_articles_file_Bert(articles_file: str, classified_articles_file: str):
+    articles_raw = pre.read_file(articles_file)
+    labels_raw = pre.read_file(classified_articles_file)
+
+    title = [get_data_from_article(article) for article in articles_raw['articles']['article']]
+    labels = [get_labels(article) for article in labels_raw['articles']['article']]
+    df_titles = pd.DataFrame(title)
+    df_labels = pd.DataFrame(labels)
+    df = df_titles.merge(df_labels, on='id')
+    df.label = df.label.astype('int')
+    df['https'] = df.url.map(lambda x: urlsplit(x).scheme == 'https').astype('int')
+    df['domain'] = df.url.map(lambda x: urlsplit(x).netloc)
+    df['country'] = df.domain.map(lambda x: x.split('.')[-1])
+    # print("Correlation between https and Hyperpartisan", df.corr())
+    df.title = df.title.apply(str)
+    article_titles = df.title.values.tolist()
+    preprocessed_titles = pre.create_corpus_Bert(df.title.values, False)
+    df.title = preprocessed_titles
+    return df
+
+
 def transform_to_tfid(articles_file: str, classified_articles_file: str):
     df = get_df_from_articles_file(articles_file, classified_articles_file)
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
@@ -65,7 +86,7 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
 def transform_to_Bert(articles_file: str, classified_articles_file: str):
-    df = get_df_from_articles_file(articles_file, classified_articles_file)
+    df = get_df_from_articles_file_Bert(articles_file, classified_articles_file)
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
     bert_embedding = BertEmbedding()
     df_titles_values=df_train.title.values.tolist()
@@ -73,18 +94,37 @@ def transform_to_Bert(articles_file: str, classified_articles_file: str):
     result_test = bert_embedding(df_test.title.values.tolist())
     train_x = pd.DataFrame(result_train, columns=['A', 'Vector'])
     train_x = train_x.drop(columns=['A'])
-
+    train_x = train_x.values
     test_x = pd.DataFrame(result_test, columns=['A', 'Vector'])
     test_x=test_x.drop(columns=['A'])
     test_x=test_x.values
-    train_x=train_x.values
-    print(test_x)
-    print(train_x)
+    result_train_x=[]
+    result_test_x=[]
+
     train_y = df_train.label.values
     test_y = df_test.label.values
-    pad_sequences(train_x, maxlen=None, dtype='float32', padding='post', value=0.0)
-    pad_sequences(test_y, maxlen=None, dtype='float32', padding='post', value=0.0)
-    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
+    for item in train_x:
+        row_list = []
+        for item1 in item[0]:
+            row_list.append(item1)
+        result_train_x.append(row_list)
+    print("result of the trian~_X is: /n")
+    print(result_train_x)
+    padded_train= keras.preprocessing.sequence.pad_sequences(result_train_x, maxlen=23, dtype='float32', padding='post', truncating='post',
+                                                        value=0.0)
+
+    for item in test_x:
+        row_list = []
+        for item1 in item[0]:
+            row_list.append(item1)
+        result_test_x.append(row_list)
+    print("result of the test~_X is: /n")
+    print(result_test_x)
+    padded_test = keras.preprocessing.sequence.pad_sequences(result_test_x, maxlen=23, dtype='float32',  padding='post',
+                                                              truncating='post',
+                                                              value=0.0)
+
+    return {'train_x': padded_train, 'test_x': padded_test, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
 
 
@@ -125,8 +165,9 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
 
 def initialize_training_test_data(articles_file: str, classified_articles_file: str, model_type: str):
     TRAINING_DATA_EXTRACTOR_FUNCS = {'logistic': transform_to_tfid,
-                                     'dense': transform_to_Bert,
-                                     'lstm': transform_to_dense_representation}
+                                     'dense': transform_to_tfid,
+                                     'lstm': transform_to_dense_representation,
+                                     'CNN': transform_to_Bert}
     if model_type in TRAINING_DATA_EXTRACTOR_FUNCS.keys() and TRAINING_DATA_EXTRACTOR_FUNCS[model_type] is not None:
         return TRAINING_DATA_EXTRACTOR_FUNCS[model_type](articles_file, classified_articles_file)
     return None
@@ -147,7 +188,7 @@ def train_and_predict(articles_file: str, classified_articles_file: str, model_t
         # Keras model
         model.summary()
         start_time = time.time()
-        history = model.fit(train_x, train_y, epochs=256, validation_data=(test_x, test_y),
+        history = model.fit(train_x, train_y, epochs=32, validation_data=(test_x, test_y),
                             verbose=2)
         print('Keras model finished training in %s seconds' % (time.time() - start_time))
         # plot history
@@ -197,7 +238,7 @@ if __name__ == "__main__":
     arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles.xml',
                             const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
     arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='logistic',
-                            const='logistic', help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), logistic (sklearn Logistic Regression Classifier)')
+                            const='logistic', help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), CNN(bert_CNN), logistic (sklearn Logistic Regression Classifier)')
     args = vars(arg_parser.parse_args())
     # print(args)
     # pre.analyze_articles(args['articles'])
