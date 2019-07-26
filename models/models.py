@@ -77,11 +77,9 @@ def create_CNN1D(**kwargs):
     verbose, epochs, batch_size = 0, 10, 32
     n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], 1
     model = Sequential()
-    model.add(Conv1D(filters=1024, kernel_size=4, activation='relu', input_shape=(n_timesteps, n_features)))
+    model.add(Conv1D(filters=128, kernel_size=4, activation='relu', input_shape=(n_timesteps, n_features)))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Dropout(0.25))
-    model.add(Conv1D(filters=1024, kernel_size=4, activation='relu', input_shape=(n_timesteps, n_features)))
-    model.add(MaxPooling1D(pool_size=2))
+    model.add(BatchNormalization())
     model.add(Dropout(0.25))
     model.add(Flatten())
     model.add(Dense(32, activation='relu'))

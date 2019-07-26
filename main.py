@@ -66,6 +66,7 @@ def get_df_from_articles_file_Bert(articles_file: str, classified_articles_file:
     article_titles = df.title.values.tolist()
     preprocessed_titles = pre.create_corpus_Bert(df.title.values, False)
     df.title = preprocessed_titles
+    df = df.head(5000)
     return df
 
 
@@ -85,10 +86,25 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     test_y = df_test.label.values
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
+
+def bert_Extract(rawBertData):
+    result_x=[]
+    for item in rawBertData:
+        row_list = []
+        for item1 in item[0]:
+            row_list.append(item1)
+        result_x.append(row_list)
+    padded = keras.preprocessing.sequence.pad_sequences(result_x, maxlen=15, dtype='float32',
+                                                              padding='post', truncating='post',
+                                                              value=0.0)
+    return padded
+
+
+
 def transform_to_Bert(articles_file: str, classified_articles_file: str):
     df = get_df_from_articles_file_Bert(articles_file, classified_articles_file)
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
-    bert_embedding = BertEmbedding()
+    bert_embedding = BertEmbedding(15)
     df_titles_values=df_train.title.values.tolist()
     result_train = bert_embedding(df_titles_values)
     result_test = bert_embedding(df_test.title.values.tolist())
@@ -103,27 +119,8 @@ def transform_to_Bert(articles_file: str, classified_articles_file: str):
 
     train_y = df_train.label.values
     test_y = df_test.label.values
-    for item in train_x:
-        row_list = []
-        for item1 in item[0]:
-            row_list.append(item1)
-        result_train_x.append(row_list)
-    print("result of the trian~_X is: /n")
-    print(result_train_x)
-    padded_train= keras.preprocessing.sequence.pad_sequences(result_train_x, maxlen=23, dtype='float32', padding='post', truncating='post',
-                                                        value=0.0)
-
-    for item in test_x:
-        row_list = []
-        for item1 in item[0]:
-            row_list.append(item1)
-        result_test_x.append(row_list)
-    print("result of the test~_X is: /n")
-    print(result_test_x)
-    padded_test = keras.preprocessing.sequence.pad_sequences(result_test_x, maxlen=23, dtype='float32',  padding='post',
-                                                              truncating='post',
-                                                              value=0.0)
-
+    padded_train= bert_Extract(train_x)
+    padded_test=bert_Extract(test_x)
     return {'train_x': padded_train, 'test_x': padded_test, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
 
 
@@ -233,9 +230,9 @@ def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], inp
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
 
-    arg_parser.add_argument('-a', '--articles', nargs='?', type=str, default='data/articles.xml',
+    arg_parser.add_argument('-a', '--articles', nargs='?', type=str, default='data/articles_BIG.xml',
                             const='data/articles.xml', help='Path to XML file of articles')
-    arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles.xml',
+    arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles_BIG.xml',
                             const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
     arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='logistic',
                             const='logistic', help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), CNN(bert_CNN), logistic (sklearn Logistic Regression Classifier)')

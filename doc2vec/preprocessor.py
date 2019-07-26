@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 import nltk
 nltk.download('wordnet')
-nltk.download('stopwords')
+# nltk.download('stopwords')
 
 
 def preprocess(text):
@@ -108,7 +108,7 @@ def create_corpus_Bert(articles, should_treat_each_article_separately: bool):
     stop_words = get_stop_words()
     lem = WordNetLemmatizer()
     for i in range(0, len(articles)):
-        text = re.sub('[^a-zA-Z!?]', ' ', articles[i])
+        text = re.sub('[^a-zA-Z]', ' ', articles[i])
         text = re.sub("(\\d|\\W)+", " ", text)
         text = text.lower().split()
         text = [lem.lemmatize(word) for word in text if not word in stop_words]
