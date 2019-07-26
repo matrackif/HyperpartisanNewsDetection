@@ -104,7 +104,7 @@ def bert_Extract(rawBertData):
 def transform_to_Bert(articles_file: str, classified_articles_file: str):
     df = get_df_from_articles_file_Bert(articles_file, classified_articles_file)
     df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
-    bert_embedding = BertEmbedding(15)
+    bert_embedding = BertEmbedding(max_seq_length=15)
     df_titles_values=df_train.title.values.tolist()
     result_train = bert_embedding(df_titles_values)
     result_test = bert_embedding(df_test.title.values.tolist())
