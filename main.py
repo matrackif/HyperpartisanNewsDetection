@@ -5,6 +5,8 @@ import pandas as pd
 from urllib.parse import urlsplit
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
 import numpy as np
 import models.models
 import time
@@ -45,7 +47,7 @@ def get_df_from_articles_file(articles_file: str, classified_articles_file: str)
     article_titles = df.title.values.tolist()
     preprocessed_titles = pre.create_corpus(article_titles, False)
     df.title = preprocessed_titles
-    return df
+    return df.head(3000)
 
 
 def get_df_from_articles_file_Bert(articles_file: str, classified_articles_file: str):
@@ -69,6 +71,30 @@ def get_df_from_articles_file_Bert(articles_file: str, classified_articles_file:
     df = df.head(5000)
     return df
 
+def get_df_from_articles_file_Lstm(articles_file: str, classified_articles_file: str):
+    articles_raw = pre.read_file(articles_file)
+    labels_raw = pre.read_file(classified_articles_file)
+
+    title = [get_data_from_article(article) for article in articles_raw['articles']['article']]
+    labels = [get_labels(article) for article in labels_raw['articles']['article']]
+    df_titles = pd.DataFrame(title)
+    df_labels = pd.DataFrame(labels)
+    df = df_titles.merge(df_labels, on='id')
+    df.label = df.label.astype('int')
+    df['https'] = df.url.map(lambda x: urlsplit(x).scheme == 'https').astype('int')
+    df['domain'] = df.url.map(lambda x: urlsplit(x).netloc)
+    df['country'] = df.domain.map(lambda x: x.split('.')[-1])
+    # print("Correlation between https and Hyperpartisan", df.corr())
+    df.title = df.title.apply(str)
+    article_titles = df.title.values.tolist()
+    preprocessed_titles = pre.create_corpus_LSTM(df.title.values, False)
+    df.title = preprocessed_titles
+    df = df.head(600)
+    return df
+
+
+
+
 
 def transform_to_tfid(articles_file: str, classified_articles_file: str):
     df = get_df_from_articles_file(articles_file, classified_articles_file)
@@ -85,6 +111,8 @@ def transform_to_tfid(articles_file: str, classified_articles_file: str):
     train_y = df_train.label.values
     test_y = df_test.label.values
     return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
+
+
 
 
 def bert_Extract(rawBertData):
@@ -122,6 +150,29 @@ def transform_to_Bert(articles_file: str, classified_articles_file: str):
     padded_train= bert_Extract(train_x)
     padded_test=bert_Extract(test_x)
     return {'train_x': padded_train, 'test_x': padded_test, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
+
+def transform_to_Lstm(articles_file: str, classified_articles_file: str):
+    df = get_df_from_articles_file_Lstm(articles_file, classified_articles_file)
+    df_train, df_test, _, _ = train_test_split(df, df.label, stratify=df.label, test_size=0.2)
+    bert_embedding = BertEmbedding(max_seq_length=15)
+    df_titles_values=df_train.title.values.tolist()
+    result_train = bert_embedding(df_titles_values)
+    result_test = bert_embedding(df_test.title.values.tolist())
+    train_x = pd.DataFrame(result_train, columns=['A', 'Vector'])
+    train_x = train_x.drop(columns=['A'])
+    train_x = train_x.values
+    test_x = pd.DataFrame(result_test, columns=['A', 'Vector'])
+    test_x=test_x.drop(columns=['A'])
+    test_x=test_x.values
+    result_train_x=[]
+    result_test_x=[]
+
+    train_y = df_train.label.values
+    test_y = df_test.label.values
+    padded_train= bert_Extract(train_x)
+    padded_test=bert_Extract(test_x)
+    return {'train_x': padded_train, 'test_x': padded_test, 'train_y': train_y, 'test_y': test_y, 'input_length': train_x.shape[1], 'vocab_size': train_x.shape[1]}
+
 
 
 
@@ -163,7 +214,7 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
 def initialize_training_test_data(articles_file: str, classified_articles_file: str, model_type: str):
     TRAINING_DATA_EXTRACTOR_FUNCS = {'logistic': transform_to_tfid,
                                      'dense': transform_to_tfid,
-                                     'lstm': transform_to_dense_representation,
+                                     'lstm': transform_to_Lstm,
                                      'CNN': transform_to_Bert}
     if model_type in TRAINING_DATA_EXTRACTOR_FUNCS.keys() and TRAINING_DATA_EXTRACTOR_FUNCS[model_type] is not None:
         return TRAINING_DATA_EXTRACTOR_FUNCS[model_type](articles_file, classified_articles_file)
@@ -214,6 +265,7 @@ def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], inp
 
     num_correct_pred = np.sum(pred == actual_y)
     accuracy = (num_correct_pred / float(pred.shape[0])) * 100
+    accuracy_f=num_correct_pred / float(pred.shape[0])
     print('------PREDICTION STATISTICS------')
     print('Total number of predictions:', pred.shape[0])
     print('Actual number of hyperpartisan articles:', num_actual_hyperpartisan)
@@ -222,6 +274,11 @@ def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], inp
     print('Predicted number of non-hyperpartisan articles:', num_pred_nonhyperpartisan)
     print('Number of correct predictions:', num_correct_pred)
     print('Prediction accuracy: {}%'.format(accuracy))
+    print("recall score:",  recall_score(actual_y, pred))
+    print("precision score:", precision_score(actual_y, pred))
+    f = open("score.txt", "a+")
+    f.write("{0} {1} {2}\n".format(accuracy_f, precision_score(actual_y, pred), recall_score(actual_y, pred)))
+    f.close()
     plot_confusion_matrix(actual_y, pred)
     plt.show()
     print(classification_report(actual_y, pred))
@@ -240,4 +297,7 @@ if __name__ == "__main__":
     # print(args)
     # pre.analyze_articles(args['articles'])
     train_and_predict(args['articles'], args['classified_articles'], args['model'])
+
+
+
 

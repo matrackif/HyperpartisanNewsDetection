@@ -58,11 +58,17 @@ def create_baseline2(**kwargs):
 
 # https://nlpforhackers.io/keras-intro/
 def create_lstm(**kwargs):
+    trainX = kwargs.get('train_x', None)
+    verbose, epochs, batch_size = 0, 10, 32
+    n_timesteps, n_features, n_outputs = trainX.shape[1], trainX.shape[2], 1
     model = Sequential()
-    model.add(Embedding(kwargs.get('vocab_size', 0),
-                        64,  # Embedding size
-                        input_length=kwargs.get('input_length', 0)))
-    model.add(LSTM(256))
+    # model.add(Embedding(kwargs.get('vocab_size', 0),
+    #                     64,  # Embedding size
+    #                     input_length=kwargs.get('input_length', 0)))
+
+    model.add(LSTM(256, input_shape=(n_timesteps, n_features)))
+    model.add(Dense(64))
+    model.add(Dropout(0.5))
     model.add(Dense(units=1, activation='sigmoid'))
     model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model

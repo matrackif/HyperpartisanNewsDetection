@@ -118,6 +118,24 @@ def create_corpus_Bert(articles, should_treat_each_article_separately: bool):
         corpus.append(text)
     return corpus
 
+
+
+def create_corpus_LSTM(articles, should_treat_each_article_separately: bool):
+    corpus = []
+    stop_words = get_stop_words()
+    lem = WordNetLemmatizer()
+    for i in range(0, len(articles)):
+        text =re.sub(r"[^A-Za-z0-9!?,.]", " ", articles[i])
+        text = text.lower().split()
+        text = [lem.lemmatize(word) for word in text if not word in stop_words]
+        text = " ".join(text)
+        if should_treat_each_article_separately:
+            text = text.split()
+        corpus.append(text)
+    return corpus
+
+
+
 def get_stop_words():
     stop_words = set(stopwords.words("english"))
     new_words = ["one", "would", "also"]
