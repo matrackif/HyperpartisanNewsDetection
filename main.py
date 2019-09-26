@@ -18,6 +18,26 @@ import keras
 from typing import Union
 
 
+def get_article_data_score(articles_file: str, classified_articles_file: str):
+    labels_raw = pre.read_file(classified_articles_file)
+    articles_raw = pre.read_file(articles_file)
+    articles, ids = pre.get_articles(articles_raw)
+    corpus = pre.create_corpus(articles, False)
+    emotions_data = pre.read_emotions_data()
+    political_data = pre.read_political_data()
+    scores = []
+    for i in range(0, 100):
+        scores.append(pre.get_article_score(corpus[i], emotions_data, political_data))
+        print(i)
+    df_articles = pd.DataFrame(scores)
+    df_articles['id'] = ids[0:100]
+    labels = [get_labels(article) for article in labels_raw['articles']['article']]
+    df_labels = pd.DataFrame(labels)
+    df = df_articles.merge(df_labels, on='id')
+    x_train, x_test, y_train, y_test = train_test_split(df, df.label, test_size=0.1)
+    return {'train_x': x_train.iloc[:, 0:11], 'test_x': x_test.iloc[:, 0:11], 'train_y': y_train, 'test_y': y_test}
+
+
 def get_data_from_article(article):
     return {'id': article['@id'], 'title': article['@title']}
 
@@ -92,13 +112,15 @@ def transform_to_dense_representation(articles_file: str, classified_articles_fi
         train_y, test_y = df.label[train_indexes], df.label[test_indexes]
         break
 
-    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y, 'input_length': MAX_TITLE_LENGTH, 'vocab_size': num_unique_words}
+    return {'train_x': train_x, 'test_x': test_x, 'train_y': train_y, 'test_y': test_y,
+            'input_length': MAX_TITLE_LENGTH, 'vocab_size': num_unique_words}
 
 
 def initialize_training_test_data(articles_file: str, classified_articles_file: str, model_type: str):
     TRAINING_DATA_EXTRACTOR_FUNCS = {'logistic': transform_to_tfid,
                                      'dense': transform_to_tfid,
-                                     'lstm': transform_to_dense_representation}
+                                     'lstm': transform_to_dense_representation,
+                                     'sentiment': get_article_data_score}
     if model_type in TRAINING_DATA_EXTRACTOR_FUNCS.keys() and TRAINING_DATA_EXTRACTOR_FUNCS[model_type] is not None:
         return TRAINING_DATA_EXTRACTOR_FUNCS[model_type](articles_file, classified_articles_file)
     return None
@@ -115,6 +137,8 @@ def train_and_predict(articles_file: str, classified_articles_file: str, model_t
     model = models.models.get_model(model_type, ret)
     if model_type == 'logistic':
         model.fit(train_x, train_y)
+    elif model_type == 'sentiment':
+        predict(train_x, train_y)
     else:
         # Keras model
         model.summary()
@@ -130,12 +154,46 @@ def train_and_predict(articles_file: str, classified_articles_file: str, model_t
         plt.xlabel('Epoch')
         plt.legend()
         plt.show()
-
-    print(model_type, 'train data statistics:')
-    print_and_plot_statistics(model, train_x, train_y)
-    print(model_type, 'test data statistics:')
-    print_and_plot_statistics(model, test_x, test_y)
+    if model_type != 'sentiment':
+        print(model_type, 'train data statistics:')
+        print_and_plot_statistics(model, train_x, train_y)
+        print(model_type, 'test data statistics:')
+        print_and_plot_statistics(model, test_x, test_y)
     return model
+
+
+def predict(train_x, train_y):
+    prediction = []
+    for i in range(0, train_x.shape[0]):
+        if ((train_x.iloc[i, 5] / train_x.iloc[i, 6] > 1.35 or
+             train_x.iloc[i, 5] / train_x.iloc[i, 6] < 0.65) and
+                train_x.iloc[i, 10] > 0.01):
+            prediction.append(True)
+        else:
+            prediction.append(False)
+    analyze_results(prediction, train_y)
+
+
+def analyze_results(pred, train_y):
+    num_actual_hyperpartisan = np.sum(train_y)
+    num_actual_nonhyperpartisan = np.count_nonzero(train_y == 0)
+
+    num_pred_hyperpartisan = np.sum(pred)
+    num_pred_nonhyperpartisan = np.count_nonzero(pred == 0)
+
+    num_correct_pred = np.sum(pred == train_y)
+    accuracy = (num_correct_pred / float(len(pred))) * 100
+    print('------PREDICTION STATISTICS------')
+    print('Total number of predictions:', len(pred))
+    print('Actual number of hyperpartisan articles:', num_actual_hyperpartisan)
+    print('Actual number of non-hyperpartisan articles:', num_actual_nonhyperpartisan)
+    print('Predicted number of hyperpartisan articles:', num_pred_hyperpartisan)
+    print('Predicted number of non-hyperpartisan articles:', num_pred_nonhyperpartisan)
+    print('Number of correct predictions:', num_correct_pred)
+    print('Prediction accuracy: {}%'.format(accuracy))
+    plot_confusion_matrix(train_y, pred)
+    plt.show()
+    print(classification_report(train_y, pred))
 
 
 def print_and_plot_statistics(model: Union[keras.Model, LogisticRegression], input_x: np.ndarray, actual_y: np.ndarray):
@@ -168,10 +226,11 @@ if __name__ == "__main__":
                             const='data/articles.xml', help='Path to XML file of articles')
     arg_parser.add_argument('-c', '--classified-articles', nargs='?', type=str, default='data/classifiedArticles.xml',
                             const='data/classifiedArticles.xml', help='Path to XML file of classified articles')
-    arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='logistic',
-                            const='logistic', help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), logistic (sklearn Logistic Regression Classifier)')
+    arg_parser.add_argument('-m', '--model', nargs='?', type=str, default='sentiment',
+                            const='logistic',
+                            help='This argument allows us to choose the model type. Supported values: dense (Keras), LSTM (Keras), logistic (sklearn Logistic Regression Classifier)')
     args = vars(arg_parser.parse_args())
     # print(args)
+    # get_article_data_score(args['articles'], args['classified_articles'])
     # pre.analyze_articles(args['articles'])
     train_and_predict(args['articles'], args['classified_articles'], args['model'])
-

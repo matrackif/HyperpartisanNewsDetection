@@ -6,7 +6,8 @@ from sklearn.linear_model import LogisticRegression
 def get_model(model_type: str, args: dict):
     MODELS = {'dense': create_baseline2,
               'lstm': create_lstm,
-              'logistic': create_logistic_regression}
+              'logistic': create_logistic_regression,
+              'sentiment': create_logistic_regression}
     if model_type in MODELS.keys() and MODELS[model_type] is not None:
         return MODELS[model_type](**args)
     return None
