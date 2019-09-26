@@ -1,6 +1,7 @@
 import re
 import codecs
 import pandas as pd
+import numpy as np
 from xmljson import badgerfish as bf
 from xml.etree.ElementTree import fromstring
 from nltk.corpus import stopwords
@@ -52,9 +53,11 @@ def describe_dataset(articles_raw):
 
 def get_articles(articles_raw):
     articles = []
+    ids =[]
     for article in articles_raw['articles']['article']:
         articles.append(get_article_text(article, ''))
-    return articles
+        ids.append(article['@id'])
+    return articles, ids
 
 
 def get_articles_word_count(articles_raw):
@@ -126,3 +129,41 @@ def get_most_frequent(vec: CountVectorizer, corpus, n: int):
     words_freq = sorted(words_freq, key=lambda x: x[1],
                         reverse=True)
     return words_freq[:n]
+
+
+def get_article_score(article, emotions_data, political_data):
+    emotions = np.zeros((10,), dtype=np.int)
+    political_bias = 0
+    words = article.split(" ")
+    for word in words:
+        emotions += emotions_word(emotions_data, word)
+        political_bias += get_political_score(political_data, word)
+    score = np.append(emotions, political_bias) / len(words)
+    return score
+
+
+def read_emotions_data():
+    data = pd.read_csv('data/NRC_emotion_lexicon_list.txt', sep="\t", header=None, engine='python')
+    data.columns = ["word", "emotion", "value"]
+    return data
+
+
+def emotions_word(data, word):
+    word_emotions = list(data.loc[data['word'] == word]["value"])
+    if len(word_emotions) == 0:
+        return np.zeros((10,), dtype=np.int)
+    else:
+        return word_emotions
+
+
+def read_political_data():
+    data = pd.read_csv('data/political_words.txt', sep="\t", header=None, engine='python')
+    data.columns = ["word"]
+    return data
+
+
+def get_political_score(data, word):
+    for polit_word in data['word']:
+        if polit_word == word:
+            return 1.0
+    return 0.0
